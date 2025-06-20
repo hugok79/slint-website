@@ -1,235 +1,329 @@
 #!/bin/sh
-# We assume that the repository https://github.com/DidierSpaier/slint-translations has been cloned
-# alongside https://github.com/DidierSpaier/slint-website
-# Run this script from  the root of the clone of: https://github.com/DidierSpaier/slint-website
+# Run this script from  the root of the clone of:
+# https://github.com/DidierSpaier/slint-website
 
 # The whole website accessed from https://slint.fr can be rebuilt locally after an update.
-# You can make a local rsync on the apache server: $WIP/html => /var/www/htdocs to check the
-# website locally, uncommenting line 233
+# You can make a local rsync on the Apache server: $WIP/html => /var/www/htdocs to check the
+# website locally
 # All pages are in folders by language, not in the web site directory.
-# The header of each page will include the list of languages in which it is available
-# This is true for:
-# homepage => home.html
-# support => support.html
-# If a page is not translated in a given language, it will be displayed in English
-# (through a hard link if that works).
-# The list of languages will not be included in the header of the non translated pages only,
-# i.e. translate and ChangeLog.
+# The header of most pages include the list of languages in which it is available
+# This is true for: HandBook.html, home.html, news.html, support.html and wiki.html
+#
+# If a page is not translated in a given language, it is displayed in English
+# The list of languages will not be included in the header of non translated
+# pages, currently translate.html rm -rf slint-translations and
+# internationalization_and_localization_of_shell_scripts.html
 # All pages include a header with links to:
-# Home Documentation Download Support Translate
-# TODO: write a Packages and/or Software page.
+# Home Documentation Download Support Translate Wiki
+# with the exception of pages included in the archived old website like
+# https://slint.fr/old/index.html
 
 # PO files use the ll_TT scheme, but unless there be several locales per language,
-# we store the web pages in directories named $ll the per language directories we create, to store
-# in them the English version of files not available in this language.
-# We first need to build the header.html files. they include a line of links, then a line of
-# languages in other languages in which each page is available
-# To select the languages to include we need to know in which languages each page has been
-# translated. but as the 'support' pages are built extracting parts of the handbook we need only
-# to check HandBook and homepage.
-[ "$(id -u)" -eq 0 ] && echo "Please run this script as regular user."
+# we store the web pages in directories named $ll the per language directories.
+# We build separately headers files for the translated files, which include a line
+# of languages in other languages in which each page is available.
+# To select the languages to include we need to know in which languages each page
+# has been translated. 
+
+# Before running this script, insure that all files in asciidoc format in
+# sub-directories of:
+# https://github.com/DidierSpaier/slint-translations/translations/
+# be up to date running from its root po4a with as argument the relevant
+# .cfg file in the `configuration` folder and the --no-update option.
+
+# Most sources pages, in asciidoc format and their translations are stored in
+# https://github.com/DidierSpaier/slint-translations/ that we clone here
+rm -rf slint-translations
+# If not already done...
+# git clone https://github.com/DidierSpaier/slint-translations/
+# Here for testing, I use a clone not yet in sync the remote repository
+cp -r /data/github/slint-translations .|| exit
 CWD="$(pwd)"
-github=$(cd "$CWD" && cd .. && pwd)
-ALL_LANGUAGES="de el en es fr it ja nl pl pt pt_BR ru sv uk"
-WIP="$CWD/wip"
-rm -rf "$WIP"
-rm -rf "$CWD"/HandBook "$CWD"/HandBook14.2.1 "$CWD"/homepage "$CWD"/wiki
-echo "Press Enter to continue or Ctrl+C to bail out."
-read -r
-mkdir -p "$WIP/html/doc"
+rm -rf wip/*
+mkdir -p wip/html/doc
+WIP="$CWD"/wip
+rm -rf tmp/*
+mkdir -p tmp/headers tmp/headers_wiki
+TMP="$CWD"/tmp
+SLINTDOCS="$CWD/slint-translations"
 
-SLINTDOCS="$github/slint-translations"
-PAGES="home HandBook oldHandBook support wiki news"
+header_HandBook() {
+	# We append to each file in "$CWD"/headers a list of languages in which
+	# HandBook is available, as found in "$SLINTDOCS"/translations/HandBook
+	cp "$SLINTDOCS"/sources/HandBook/HandBook.adoc \
+	"$SLINTDOCS"/translations/HandBook/en_US.HandBook.adoc || exit
+	langs="$(find "$SLINTDOCS"/translations/HandBook -name  "*adoc"|sed 's#.*/##'|cut -d_ -f1)"
+	header_HandBook="$(echo "$langs"|sort|while read -r i; do echo "* link:../$i/HandBook.html[${i#./}] "; done)"
+	echo "$header_HandBook" > "$TMP"/header_HandBook
+	(cd "$CWD"/headers || exit
+	for i in *.adoc; do
+		cat "$i" "$TMP"/header_HandBook "$CWD"/headers/bottom > "$TMP"/headers/"$i"
+	done
+	)
+}
 
-feed_support_and_documentation() {
-	# support is extracted from HandBook
-	cp -a "$SLINTDOCS"/HandBook/ "$CWD"/
-	cd "$CWD"/HandBook || exit 1
-	msgen HandBook.pot -o en_US.HandBook.po
-	langs="$(find . -name  "*po"|cut -d_ -f1)"
-	header_handbook="$(echo "$langs"|sort|while read -r i; do echo "* link:../$i/HandBook.html[${i#./}] "; done)"
+header_support() {
+	# We append to each file in "$CWD"/headers a list of languages in which
+	# HandBook is available, as found in "$SLINTDOCS"/translations/HandBook
+	# as the support.html is extracted from HandBool.html 
+	cp "$SLINTDOCS"/sources/HandBook/HandBook.adoc \
+	"$SLINTDOCS"/translations/HandBook/en_US.HandBook.adoc || exit
+	langs="$(find "$SLINTDOCS"/translations/HandBook -name  "*adoc"|sed 's#.*/##'|cut -d_ -f1)"
 	header_support="$(echo "$langs"|sort|while read -r i; do echo "* link:../$i/support.html[${i#./}] "; done)"
-	for handbookpo in *.HandBook.po; do
-		ll_TT="${handbookpo%.*.*}"
-		echo "$ll_TT" >> "$WIP"/languages
-		ll="${ll_TT%_*}"
-		cp ../headers/"$ll_TT".header.adoc "$WIP"
-		{
-		echo "$header_handbook"
-		echo "--"
-		echo
-		echo 'toc::[left]'
-		} >> "$WIP"/"$ll_TT".header.adoc
-		po4a-translate -k 60 -M UTF-8 -m "$SLINTDOCS"/sources/HandBook/HandBook.adoc -f asciidoc -p "$handbookpo" -l "$WIP"/"${ll_TT}".HandBook.part.adoc
-		cat "$WIP"/"$ll_TT".header.adoc "$WIP"/"${ll_TT}".HandBook.part.adoc > "$WIP"/"${ll_TT}".HandBook.adoc
-		asciidoctor -a stylesdir=../css -a stylesheet=slint.css -a linkcss -a copycss="$SLINTDOCS"/css/slint.css -D "$WIP" -a doctype=book "$WIP"/"${ll_TT}".HandBook.adoc -o "$WIP"/html/"$ll"/HandBook.html
-		sed -i 's@<p><a@<a@;s@</a></p>@</a>@;/langmen/s@.*@<p></p>\n&@;/"toc"/s@.*@<p></p>\n&@'  "$WIP"/html/"$ll"/HandBook.html
+	echo "$header_support" > "$TMP"/header_support
+	(cd "$CWD"/headers || exit
+	for i in *.adoc; do
+		cat "$i" "$TMP"/header_support "$CWD"/headers/bottom > "$TMP/headers/$i"
 	done
-	for handbookpo in *.HandBook.po; do
-		ll_TT="${handbookpo%.*.*}"
-		echo "$ll_TT" >> "$WIP"/languages
-		ll="${ll_TT%_*}"
-		cp ../headers/"$ll_TT".header.adoc "$WIP"
-		{
-		echo
-		echo "$header_support"
-		echo "--"
-		echo
-		echo 'toc::[]'
-		} >> "$WIP"/"$ll_TT".header.adoc
-		po4a-translate -M UTF-8 -m "$SLINTDOCS"/sources/HandBook/HandBook.adoc -f asciidoc -p "$handbookpo" -l "$WIP"/"${ll_TT}".HandBook.part.adoc
-		sed -n "\@// Support@,\@// Acknowledgments@p" "$WIP"/"${ll_TT}".HandBook.part.adoc|head -n -1  \
-		| sed "s@// .*@[.debut]@" >> "$WIP"/"${ll_TT}".support.part.adoc
-		cat "$WIP"/"$ll_TT".header.adoc "$WIP"/"${ll_TT}".support.part.adoc > "$WIP"/"${ll_TT}".support.adoc
-		asciidoctor -a stylesdir=../css -a stylesheet=slint.css -a linkcss -a copycss="$SLINTDOCS"/css/slint.css -D "$WIP" "$WIP"/"${ll_TT}".support.adoc -o "$WIP"/html/"$ll"/support.html
-		sed -i 's@<p><a@<a@;s@</a></p>@</a>@;/langmen/s@.*@<p></p>\n&@;/"toc"/s@.*@<p></p>\n&@'  "$WIP"/html/"$ll"/support.html
-	done
+	)
 }
-feed_news() {
-	cp -a "$SLINTDOCS"/news/ "$CWD"/ || exit
-	cd "$CWD"/news || exit 1
-	msgen ./news.pot -o en_US.news.po
-	langs="$(find . -name  "*po"|sed "s@..@@"|cut -d_ -f1)"
-	header_news="$(echo "$langs"|sort|while read -r i; do echo "* link:../$i/news.html[${i#./}] "; done)"
-	for newspo in *.news.po; do
-		ll_TT=${newspo%.*.*}
-		ll="${ll_TT%_*}"
-		cp ../headers/"$ll_TT".header.adoc "$WIP"
-		{
-		echo "$header_news"
-		echo
-		echo "--"
-		echo
-		echo
-		} >> "$WIP"/"$ll_TT".header.adoc
-		pwd
-		po4a-translate -k 40 -M UTF-8 -m "$SLINTDOCS"/sources/news/news.adoc -f asciidoc -p "$newspo" -l "$WIP"/"${ll_TT}".news.part.adoc
-		sed "/:toc/d;/:sectnum/d" "$WIP"/"$ll_TT".header.adoc >"$WIP"/prov.adoc
-		cat "$WIP"/prov.adoc "$WIP"/"${ll_TT}".news.part.adoc > "$WIP"/"${ll_TT}".news.adoc
-		asciidoctor -a stylesdir=../css -a stylesheet=slint.css -a linkcss -a copycss="$SLINTDOCS"/css/slint.css -D "$WIP" -a doctype=book "$WIP"/"${ll_TT}".news.adoc -o "$WIP"/html/"$ll"/news.html
-		sed -i 's@<p><a@<a@;s@</a></p>@</a>@;/langmen/s@.*@<p></p>\n&@;/"toc"/s@.*@<p></p>\n&@' "$WIP"/html/"$ll"/news.html
-		sleep 1
-	done
-}
-feed_homepage() {
-	cp -a "$SLINTDOCS"/homepage/ "$CWD"/ || exit
-	cd "$CWD"/homepage || exit 1
-	msgen ./homepage.pot -o en_US.homepage.po
-	langs="$(find . -name  "*po"|sed "s@..@@"|cut -d_ -f1)"
+
+header_homepage() {
+	# We append to each file in "$CWD"/headers a list of languages in which
+	# homepage is available, as found in "$SLINTDOCS"/translations/homepage
+	cp "$SLINTDOCS"/sources/homepage/homepage.adoc \
+	"$SLINTDOCS"/translations/homepage/en_US.homepage.adoc || exit
+	langs="$(find "$SLINTDOCS"/translations/homepage -name  "*adoc"|sed 's#.*/##'|cut -d_ -f1)"
 	header_homepage="$(echo "$langs"|sort|while read -r i; do echo "* link:../$i/home.html[${i#./}] "; done)"
-	for homepagepo in *.homepage.po; do
-		ll_TT=${homepagepo%.*.*}
-		ll="${ll_TT%_*}"
-		cp ../headers/"$ll_TT".header.adoc "$WIP"
-		{
-		echo "$header_homepage"
-		echo
-		echo "--"
-		echo
-		echo
-		} >> "$WIP"/"$ll_TT".header.adoc
-		pwd
-		po4a-translate -k 40 -M UTF-8 -m "$SLINTDOCS"/sources/homepage/homepage.adoc -f asciidoc -p "$homepagepo" -l "$WIP"/"${ll_TT}".homepage.part.adoc
-		sed "/:toc/d;/:sectnum/d" "$WIP"/"$ll_TT".header.adoc >"$WIP"/prov.adoc
-		cat "$WIP"/prov.adoc "$WIP"/"${ll_TT}".homepage.part.adoc > "$WIP"/"${ll_TT}".homepage.adoc
-		asciidoctor -a stylesdir=../css -a stylesheet=slint.css -a linkcss -a copycss="$SLINTDOCS"/css/slint.css -D "$WIP" -a doctype=book "$WIP"/"${ll_TT}".homepage.adoc -o "$WIP"/html/"$ll"/home.html
-		sed -i 's@<p><a@<a@;s@</a></p>@</a>@;/langmen/s@.*@<p></p>\n&@;/"toc"/s@.*@<p></p>\n&@' "$WIP"/html/"$ll"/home.html
-		sleep 1
+	echo "$header_homepage" > "$TMP"/header_homepage
+	(cd "$CWD"/headers || exit
+	for i in *.adoc; do
+		cat "$i" "$TMP"/header_homepage "$CWD"/headers/bottom > "$TMP"/headers/"$i"
 	done
+	)
 }
-feed_wiki() {
-	# Article of the wiki are translated one by one, not the wiki as whole.
-	# We will mention the wiki as translated in a given language as soon as one of the articles has been translated.
-	cp -a "$SLINTDOCS"/wiki/ "$CWD"/ || exit
-	cd "$CWD"/wiki || exit 1
-	locales="$(find . -name  "*po"|sed "s@.*/@@"|cut -d"." -f1|sort|uniq)"
-locales="$locales
-en_US"
-	langs="$(find . -name  "*po"|sed "s@.*/@@"|cut -d_ -f1|sort|uniq)"
-langs="$langs
-en"
-	# langs lists the two characters languages code in which at least one article has been translated.
-	header_wiki="$(echo "$langs"|sort|while read -r i; do echo "* link:../$i/wiki.html[${i#./}] "; done)"
-#echo "$header_wiki"
-#echo "$langs"|sort|while read -r i; do echo "* link:../$i/wiki.html[${i#./}] "; done
-	for ll_TT in $locales; do
-		sed "/:toclevels: 2/d;/:sectnums:/d" ../headers/"$ll_TT".header.adoc > "$WIP"/"$ll_TT".wiki.adoc
-		{
-		echo "$header_wiki"
-		echo
-		echo "--"
-		echo
-		echo 'toc::[]'
-		echo
-		echo [.debut]
-		} >> "$WIP"/"$ll_TT".wiki.adoc
-		for article in $(ls); do
-			articlepo="$SLINTDOCS"/wiki/"$article"/"${ll_TT}"."${article}".po
-			if [ ! -f "$articlepo" ]; then
-			# use the source asciidoc file for $article if not translated into $locale 
-				cp "$SLINTDOCS/sources/wiki/$article/${article}.adoc" "$WIP"/"${ll_TT}"."${article}".adoc
-			else
-			# convert the PO file to asciidoc
-			po4a-translate -M UTF-8 -m "$SLINTDOCS"/sources/wiki/$article/$article.adoc -f asciidoc -p "$articlepo" -l "$WIP"/"${ll_TT}"."$article".adoc
-			fi
-			# add the placeholder for $WIP"/"${ll_TT}".article.adoc in "WIP"/"$ll_TT".wiki.adoc
-			echo "include::$WIP/${ll_TT}.${article}.adoc[ ]" >>"$WIP"/"$ll_TT".wiki.adoc
-			echo >> "$WIP"/"$ll_TT".wiki.adoc
+
+header_news() {
+	# We append to each file in "$CWD"/headers a list of languages in which
+	# news is available, as found in "$SLINTDOCS"/translations/news
+	cp "$SLINTDOCS"/sources/news/news.adoc \
+	"$SLINTDOCS"/translations/news/en_US.news.adoc || exit
+	langs="$(find "$SLINTDOCS"/translations/news -name  "*adoc"|sed 's#.*/##'|cut -d_ -f1)"
+	header_news="$(echo "$langs"|sort|while read -r i; do echo "* link:../$i/news.html[${i#./}] "; done)"
+	echo "$header_news" > "$TMP"/header_news
+	(cd "$CWD"/headers || exit
+	for i in *.adoc; do
+		cat "$i" "$TMP"/header_news "$CWD"/headers/bottom > "$TMP"/headers/"$i"
+	done
+	)
+}
+
+header_wiki() {
+	# We consider that the wiki has been translated in a given language as soon
+	# as one of its articles has been translated in this langage.
+	cd "$SLINTDOCS/translations/wiki" || exit
+	articles="$(find . -type d -mindepth 1 -maxdepth 1|sed 's#..##'|sort)"
+	echo "$articles"|while read -r article; do 
+		cp "$SLINTDOCS/sources/wiki/$article/${article}.adoc" \
+			"$article/en_US.${article}.adoc" || exit
+	done
+	# We display in English the non translated articles.
+	locales="$(find . -name "*.adoc"|sed 's#.*/##'|cut -d. -f1|sort|uniq)"
+	langs="$(echo "$locales"|cut -d_ -f1)"
+	for ll_TT in $locales; do		
+		echo "$articles"|while read -r article; do
+		if [ ! -f "$article/${ll_TT}.${article}.adoc" ]; then
+			cp "$article/en_US.${article}.adoc" \
+			"$article/${ll_TT}.${article}.adoc" || exit
+		fi
 		done
-		ll="${ll_TT%_*}"
-		asciidoctor -a stylesdir=../css -a stylesheet=slint.css -a linkcss -a copycss="$SLINTDOCS"/css/slint.css -D "$WIP" -a doctype=book "$WIP"/"${ll_TT}".wiki.adoc -o "$WIP"/html/"$ll"/wiki.html
-		sed -i 's@<p><a@<a@;s@</a></p>@</a>@;/langmen/s@.*@<p></p>\n&@;/"toc"/s@.*@<p></p>\n&@' "$WIP"/html/"$ll"/wiki.html
 	done
+	header_wiki="$(echo "$langs"|sort|while read -r i; do echo "* link:../$i/wiki.html[${i#./}] "; done)"
+	echo "$header_wiki"|sort|uniq > "$TMP"/headers_wiki/header_wiki
+	(cd "$CWD"/headers || exit
+	for i in *.adoc; do
+		cat "$i" "$TMP"/headers_wiki/header_wiki "$CWD"/headers/bottom_wiki > "$TMP"/headers_wiki/"$i"
+		# Rename "$ll_TT.header.adoc" as "ll_TT.wiki.adoc" as initially they
+		# are identical.
+		rename header wiki "$TMP"/headers_wiki/"$i"
+	done
+	# We have now in "$TMP"/headers_wiki/ the localized wiki pages, without
+	# the links to the included articles that we will add in feed_wiki.
+	)
 }
-feed_HandBook14_2_1() {
-	cp -a "$SLINTDOCS"/sources/HandBook14.2.1 "$CWD"/ || exit 1
-	cd "$CWD"/HandBook14.2.1 || exit 1
+
+feed_HandBook14_2_1 () {
+	cd "$SLINTDOCS"/translations/HandBook14.2.1 || exit 1
+	# Rranslations of the old HandBook being frozen the list of langages is fix. 
 	langs=$(echo "de el en es fr it ja nl pl pt pt_BR ru sv uk"|sed "s/ /\n/g")
 	header_oldhandbook="$(echo "$langs"|while read -r i; do echo "* link:../$i/oldHandBook.html[${i#./}] "; done)"
-	for handbookadoc in *.HandBook.adoc; do
-		ll_TT=${handbookadoc%.*.*}
-		echo "$ll_TT" >> "$WIP"/languages
-		ll=${ll_TT%_*}
-		cp ../headers/"$ll_TT".header.adoc "$WIP"
-		{
-		echo
-		echo "$header_oldhandbook"
-		echo "--"
-		echo
-		echo 'toc::[]'
-		} >> "$WIP"/"$ll_TT".header.adoc
-		cat "$WIP"/"$ll_TT".header.adoc "$ll_TT".HandBook.adoc > "$WIP"/"${ll_TT}".oldHandBook.adoc
-		if [ "$ll_TT" = "pt_BR" ]; then
-			asciidoctor -a stylesdir=../css -a stylesheet=slint.css -a linkcss -a copycss="$SLINTDOCS"/css/slint.css -D "$WIP" -a doctype=book "$WIP"/"${ll_TT}".oldHandBook.adoc -o "$WIP"/html/"$ll_TT"/oldHandBook.html
-			sed -i 's@<p><a@<a@;s@</a></p>@</a>@;/langmen/s@.*@<p></p>\n&@;/"toc"/s@.*@<p></p>\n&@'  "$WIP"/html/"$ll_TT"/oldHandBook.html
+	echo "$header_oldhandbook" > "$TMP"/header_oldhandbook
+	(cd "$CWD"/headers || exit
+	for i in *.adoc; do
+		cat "$i" "$TMP"/header_oldhandbook "$CWD"/headers/bottom > "$TMP"/headers/"$i"
+	done
+	)
+	find . -name "*.adoc"|sed 's#..##'|while read -r i; do
+		ll_TT="${i%.*.*}"
+		cat "$TMP/headers/${ll_TT}.header.adoc" "$i" > bif
+		mv bif "$i"
+		ll="${ll_TT%_*}"
+		mkdir -p "$WIP"/html/"$ll"
+		asciidoctor -a stylesdir=../css -a stylesheet=slint.css -a linkcss -a \
+		copycss="$CWD"/css/slint.css -D "$WIP" -a doctype=book "$i" -o bof
+		sed 's@<p><a@<a@;s@</a></p>@</a>@;/langmen/s@.*@<p></p>\n&@;/"toc"/s@.*@<p></p>\n&@' \
+		"$WIP"/bof > "$WIP"/html/"$ll"/HandBook.html
+				if [ "$ll_TT" = "pt_BR" ]; then
+			asciidoctor -a stylesdir=../css -a stylesheet=slint.css -a linkcss -a \
+			copycss="$CWD/css/slint.css" -D "$WIP" -a doctype=book \
+			"${ll_TT}.oldHandBook.adoc" -o "$WIP"/html/"$ll_TT"/oldHandBook.html
+			sed -i 's@<p><a@<a@;s@</a></p>@</a>@;/langmen/s@.*@<p></p>\n&@;/"toc"/s@.*@<p></p>\n&@' \
+			"$WIP"/html/"$ll_TT"/oldHandBook.html
 		else
-			asciidoctor -a stylesdir=../css -a stylesheet=slint.css -a linkcss -a copycss="$SLINTDOCS"/css/slint.css -D "$WIP" -a doctype=book "$WIP"/"${ll_TT}".oldHandBook.adoc -o "$WIP"/html/"$ll"/oldHandBook.html
-			sed -i 's@<p><a@<a@;s@</a></p>@</a>@;/langmen/s@.*@<p></p>\n&@;/"toc"/s@.*@<p></p>\n&@'  "$WIP"/html/"$ll"/oldHandBook.html
+			asciidoctor -a stylesdir=../css -a stylesheet=slint.css -a linkcss -a \
+			copycss="$CWD/css/slint.css" -D "$WIP" -a doctype=book \
+			"${ll_TT}.oldHandBook.adoc" -o "$WIP"/html/"$ll"/oldHandBook.html
+			sed -i 's@<p><a@<a@;s@</a></p>@</a>@;/langmen/s@.*@<p></p>\n&@;/"toc"/s@.*@<p></p>\n&@' \
+			"$WIP"/html/"$ll"/oldHandBook.html
 		fi
 	done
-}
-complete_missing_with_english() {
-	for i in $ALL_LANGUAGES; do
-		for j in $PAGES; do
-		[ ! -f "$WIP/html/$i/${j}.html" ] && cp "$WIP"/html/en/"${j}".html "$WIP"/html/"$i"/"${j}".html
-		done
+}	
+
+feed_HandBook() {
+	( cd "$SLINTDOCS"/translations/HandBook || exit 1
+	cp "$SLINTDOCS"/sources/HandBook/HandBook.adoc en_US.HandBook.adoc || exit
+	# list the locales in which a translation of the HandBook is available.
+	langs="$(find . -name  "*adoc"|sed 's#..##'|cut -d_ -f1)"
+	find . -name "*.adoc"|sed 's#..##'|while read -r i; do
+		ll_TT="${i%.*.*}"
+		cat "$TMP/headers/${ll_TT}.header.adoc" "$i" > bif
+		mv bif "$i"
+		ll="${ll_TT%_*}"
+		mkdir -p "$WIP"/html/"$ll"
+		asciidoctor -a stylesdir=../css -a stylesheet=slint.css -a linkcss -a \
+		copycss="$CWD"/css/slint.css -D "$WIP" -a doctype=book "$i" -o bof
+		sed 's@<p><a@<a@;s@</a></p>@</a>@;/langmen/s@.*@<p></p>\n&@;/"toc"/s@.*@<p></p>\n&@' \
+		"$WIP"/bof > "$WIP"/html/"$ll"/HandBook.html
 	done
+	)
 }
 
-cp "$CWD"/htaccess/.htaccess "$WIP"/html
-cd "$CWD"/doc || exit 1
-feed_news
-feed_wiki
-feed_homepage
-feed_support_and_documentation
+feed_support() {
+	( cd "$SLINTDOCS"/translations/HandBook || exit 1
+	cp "$SLINTDOCS"/sources/HandBook/HandBook.adoc en_US.HandBook.adoc || exit
+	# The Support page is just an extract of the HandBook, so list
+	# the locales in which a translation of the HandBook is available.
+	langs="$(find . -name  "*adoc"|sed 's#..##'|cut -d_ -f1)"
+	find . -name "*.adoc"|sed 's#..##'|while read -r i; do
+		ll_TT="${i%.*.*}"
+		cat "$TMP/headers/${ll_TT}.header.adoc" "$i" > bif
+		mv bif "$i"
+		ll="${ll_TT%_*}"
+		# We convert the headers level 2 of the HandBook to level 1 in Support
+		# hence s@===@==@
+		sed -n "\@// Support@,\@// Acknowledgments@p" "$i"|head -n -1  \
+		| sed "s@// .*@[.debut]@;s@===@==@" > "$WIP/${ll_TT}.support.part.adoc"	
+		mkdir -p "$WIP"/html/"$ll"
+		cat "$TMP"/headers/"$ll_TT".header.adoc "$WIP"/"${ll_TT}".support.part.adoc \
+		> "$WIP"/"${ll_TT}".support.adoc
+		asciidoctor -a stylesdir=../css -a stylesheet=slint.css -a linkcss -a \
+		copycss="$CWD"/css/slint.css \
+		-D "$WIP" -a doctype=book "$WIP/${ll_TT}.support.adoc" -o bof
+		sed 's@<p><a@<a@;s@</a></p>@</a>@;/langmen/s@.*@<p></p>\n&@;/"toc"/s@.*@<p></p>\n&@' \
+		"$WIP"/bof > "$WIP"/html/"$ll"/support.html
+	done
+	)
+}
+
+feed_homepage() {
+	( cd "$SLINTDOCS"/translations/homepage || exit 1
+	cp "$SLINTDOCS"/sources/homepage/homepage.adoc en_US.homepage.adoc || exit
+	# list the locales in which a translation of the homepage is available.
+	langs="$(find . -name  "*adoc"|sed 's#..##'|cut -d_ -f1)"
+	find . -name "*.adoc"|sed 's#..##'|while read -r i; do
+		ll_TT="${i%.*.*}"
+		cat "$TMP/headers/${ll_TT}.header.adoc" "$i" > bif
+		mv bif "$i"
+		ll="${ll_TT%_*}"
+		mkdir -p "$WIP"/html/"$ll"
+		asciidoctor -a stylesdir=../css -a stylesheet=slint.css -a linkcss -a \
+		copycss="$CWD"/css/slint.css -D "$WIP" -a doctype=book "$i" -o bof
+		sed 's@<p><a@<a@;s@</a></p>@</a>@;/langmen/s@.*@<p></p>\n&@;/"toc"/s@.*@<p></p>\n&@' \
+		"$WIP"/bof > "$WIP"/html/"$ll"/home.html
+	done
+	)
+}
+
+feed_news() {
+	( cd "$SLINTDOCS"/translations/news || exit 1
+	cp "$SLINTDOCS"/sources/news/news.adoc en_US.news.adoc || exit
+	# list the locales in which a translation of the news is available.
+	langs="$(find . -name  "*adoc"|sed 's#..##'|cut -d_ -f1)"
+	find . -name "*.adoc"|sed 's#..##'|while read -r i; do
+		ll_TT="${i%.*.*}"
+		ll="${ll_TT%_*}"
+		cat "$TMP/headers/${ll_TT}.header.adoc" "$i" > bif
+		mv bif "$i"
+		#  echo "$ll_TT" >> "$WIP"/languages ?
+		mkdir -p "$WIP"/html/"$ll"
+		asciidoctor -a stylesdir=../css -a stylesheet=slint.css -a linkcss -a \
+		copycss="$CWD"/css/slint.css -D "$WIP" -a doctype=book "$i" -o bof
+		sed 's@<p><a@<a@;s@</a></p>@</a>@;/langmen/s@.*@<p></p>\n&@;/"toc"/s@.*@<p></p>\n&@' \
+		"$WIP"/bof > "$WIP"/html/"$ll"/news.html
+	done
+	)
+}
+
+
+feed_wiki() {
+	cd "$SLINTDOCS"/translations/wiki || exit 1
+	articles="$(find . -type d -mindepth 1 -maxdepth 1|sed 's#..##'|sort)"
+	echo "$articles"|while read -r article; do 
+		cp "$SLINTDOCS/sources/wiki/$article/${article}.adoc" \
+			"$article/en_US.${article}.adoc" || exit
+	done
+	# List all locales of translations of articles included in the wiki
+	locales="$(find . -name "*.adoc"|sed 's#.*/##'|cut -d. -f1|sort|uniq)"
+	# For each article of the wiki, if a translation in a given locale is not
+	# available, replace it by en_US.
+	for article in $articles; do
+		mkdir -p "$TMP/$article"
+		for ll_TT in $locales; do
+			ll="${ll_TT%_*}"
+			mkdir -p "$WIP"/html/"$ll"
+			echo "include::$SLINTDOCS/translations/wiki/$article/${ll_TT}.${article}.adoc[ ]" \
+			>>"$TMP"/headers_wiki/"$ll_TT".wiki.adoc
+			asciidoctor -a stylesdir=../css -a stylesheet=slint.css -a linkcss -a \
+			copycss="$CWD"/css/slint.css -D "$WIP" -a doctype=book \
+			"$TMP/headers_wiki/${ll_TT}.wiki.adoc"  -o "$TMP"/bof
+			sed 's@<p><a@<a@;s@</a></p>@</a>@;/langmen/s@.*@<p></p>\n&@;/"toc"/s@.*@<p></p>\n&@' \
+			"$TMP"/bof > "$WIP"/html/"$ll"/wiki.html
+		done
+	done
+	cd "$CWD" || exit
+}
+
+# Note: if feed_HandBook14_2_1 is run after feed_HandBook the pages Handbook.html
+# are the same as oldHandBook.html. I did not find why yet - Didier 18 June 2025
+cp htaccess/.htaccess wip/html
 feed_HandBook14_2_1
-complete_missing_with_english
-cd "$CWD"/doc || exit 1
-cp *.png "$WIP"/html/doc/
-asciidoctor -a stylesdir=../css -a stylesheet=slint.css -a linkcss -a copycss="$CWD"/css/slint.css -D "$WIP" "$CWD"/doc/translate_slint.adoc -o "$WIP"/html/doc/translate_slint.html
-sed -i 's@<p><a@<a@;s@</a></p>@</a>@;/"toc"/s@.*@<p></p>\n&@;/"toc"/s@.*@<p></p>\n&@' "$WIP"/html/doc/translate_slint.html
-asciidoctor -a stylesdir=../css -a stylesheet=slint.css -a linkcss -a copycss="$CWD"/css/slint.css -D "$WIP" "$CWD"/doc/internationalization_and_localization_of_shell_scripts.adoc -o "$WIP"/html/doc/internationalization_and_localization_of_shell_scripts.html
+header_support
+feed_support
+header_HandBook
+feed_HandBook
+header_homepage
+feed_homepage
+header_news
+feed_news
+header_wiki
+feed_wiki
+# 
+cp "$CWD"/doc/*.png "$WIP"/html/doc/
+asciidoctor -a stylesdir=../css -a stylesheet=slint.css -a linkcss -a \
+copycss="$CWD"/css/slint.css -D "$WIP" "$CWD"/doc/translate_slint.adoc \
+-o "$WIP"/html/doc/translate_slint.html
+sed -i 's@<p><a@<a@;s@</a></p>@</a>@;/"toc"/s@.*@<p></p>\n&@;/"toc"/s@.*@<p></p>\n&@' \
+"$WIP"/html/doc/translate_slint.html
+asciidoctor -a stylesdir=../css -a stylesheet=slint.css -a linkcss -a \
+copycss="$CWD"/css/slint.css -D "$WIP" \
+"$CWD"/doc/internationalization_and_localization_of_shell_scripts.adoc -o "\
+$WIP"/html/doc/internationalization_and_localization_of_shell_scripts.html
 cp "$CWD"/doc/shell_and_bash_scripts.html "$WIP"/html/doc/ || exit 1
-# Uncomment the folowing line to  
-# sudo rsync --verbose -avP --exclude-from="$CWD"/exclude -H --delete-after "$CWD"/wip/html/ /var/www/htdocs/ 
+cp -r "$CWD"/css "$WIP"/html
+# Uncomment the following line to check the web site locally
+sudo rsync --verbose -avP --exclude-from="$CWD"/exclude -H --delete-after \
+ "$CWD"/wip/html/ /var/www/htdocs/
 rm -rf "$CWD"/homepage "$CWD"/wiki "$CWD"/HandBook "$CWD"/HandBook14.2.1 "$CWD"/news
+# run from the VPS
+# su
+# sh rsync_website

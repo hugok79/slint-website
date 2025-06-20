@@ -34,7 +34,7 @@ Running Slint, possibly in a virtual machine, while not mandatory helps understa
 
 === Getting started
 
-To know what the Slint project is about, please read first if not yet done in this link:../en//HandBook.html#_introduction_to_slint[introduction to Slint] at least link:../en/HandBook.html#_about_slint[About Slint] and link:../en/HandBook.html#_support_and_contributions[Support and contributions]
+To know what the Slint project is about, just read the link:../en/home.html[home page] and also link:../en/support.html#_support[Support] to know how to communicate with users and contributors. 
 
 Translations are managed using the The Crowdin platform. The Slint project has an open policy on Crowding, meaning that anyone can join and start contributing to the translation right away.
 
@@ -48,8 +48,8 @@ In the Home section clicking on a language link opens the translation page for t
 
 It will help, especially the blind translators, to know the https://support.crowdin.com/online-editor/#keyboard-shortcuts[keyboard shortcuts]. You can review them pressing Ctrl+Shift+/
 
-Before you begin, please read <<recommendations,Practical recommendations>> below.
-
+Before you begin, please read <<recommendations,Practical recommendations>> below. You can also read link:../doc/internationalization_and_localization_of_shell_scripts.html[Internationalization and localization of shell scripts]⋅for a more in depth introduction.
+ 
 Files to be translated, tools to manage localization of shell scripts and documentation are available in the GitHub repository https://github.com/DidierSpaier/slint-translations[slint-translations]
 
 === Communicate with other Slint translators
@@ -65,7 +65,7 @@ If you want to continue a translation, we suggest that you consult with other tr
 The sources files are in English:
 
 * HandBook.adoc and homepage.adoc are in asciidoc format. They are converted to html using https://asciidoctor.org/[Asciidoctor] to provide the link:../en/HandBook.html[Slint HandBook] and the link:../en/home.html[home page] of this website. +
-* All other files are PO (Portable Objects) files, extracted from shell scripts and converted back and forth using the *gettext* and *po4a* software. To know more read link:../doc/doc/internationalization_and_localization_of_shell_scripts.adoc[Internationalization and localization of shell scripts]
+* All other files are PO (Portable Objects) files, extracted from shell scripts and converted back and forth using the *gettext* and *po4a* software. To know more read link:../doc/internationalization_and_localization_of_shell_scripts.html[Internationalization and localization of shell scripts]
 
 [NOTE]
 ====
@@ -85,7 +85,8 @@ To display your translation of the HandBook in a web browser you can do this, as
 Here is the list of files to translate and their content at time of writing:
 
 [[a001]]a001::
-Messages from the first article of the link:../en/wiki.html[WiKi]. In Crowdin the POT file is wiki/a001/a001.pot. Following articles will be named a002, a003 and so on. 
+[[a002]]a002::
+Messages from the first articles of the link:../en/wiki.html[WiKi]. In Crowdin the POT file are wiki/a001/a001.pot and wiki/a001/a002.pot. 
  
 [[auto]]auto::
 Messages from the *functions* script of the Slint installer, which superseded the *auto* script used in previous version of the installer. We kept the old name of the POT file to allow a smooth transition
@@ -94,7 +95,7 @@ Messages from the *functions* script of the Slint installer, which superseded th
 Messages from the init script *rc.S* in the installer, modified from the one in the Slackware installer.
 
 [[slint-scripts]]slint-scripts::
-This files gather messages from various shell scripts written for and used in Slint.
+This files gather messages from various shell scripts written for Slint.
 
 [[HandBook]]HandBook::
 This file is the source in Asciidoc format of the Slint link:../en/HandBook.html[Slint HandBook (version 15.0)].
@@ -133,7 +134,7 @@ Ukrainian.
 * When using the Crowdin text editor for a file in asciidoc format like HandBook and homepage, set HTML tags displaying to "SHOW" and when you find a markup like <<text1,text2>>, translate the text after te comma only (text2 in this example).
 ====
 
-The recommendations about the translation of shell scripts below also apply to commands written in the HandBook and the home page
+The recommendations about the translation of shell scripts below also apply to commands written in the HandBook and the home page.
 
 ==== Translation of shell scripts
 
